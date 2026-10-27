@@ -172,6 +172,35 @@ docs/
 
 Los archivos están comprimidos con gzip para que el repositorio sea liviano; pandas los lee directamente.
 
+## Variables de entorno: desarrollo y producción
+
+`.env.example` trae valores de **desarrollo** para que el evaluador solo tenga que hacer `docker compose up`. Esos
+valores son públicos (están en el repositorio), así que no sirven para producción.
+
+El `.env` **no** se guarda en el compose ni en las imágenes. `docker-compose.yml` solo dice de dónde leerlo: cada
+vez que se ejecuta `docker compose up`, Compose lee `.env.example` y después `.env` si existe (sus valores ganan),
+y pasa las variables a los contenedores. El archivo vive en la carpeta del proyecto de cada máquina.
+
+Para un entorno de producción:
+
+1. En el servidor, dentro de la carpeta del proyecto, crear el `.env` a partir del ejemplo:
+   `cp .env.example .env`. Este archivo está en `.gitignore`, así que nunca se sube a git.
+2. Cambiar en el `.env` todos los valores sensibles:
+   - `POSTGRES_PASSWORD` y la misma contraseña dentro de `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN`.
+   - `AIRFLOW__WEBSERVER__SECRET_KEY`: un texto largo y aleatorio.
+   - `AIRFLOW__CORE__FERNET_KEY`: una clave nueva, generada con
+     `docker run --rm apache/airflow:2.10.5 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+   - `AIRFLOW_ADMIN_USER` y `AIRFLOW_ADMIN_PASSWORD`.
+3. Levantar con `docker compose up -d`. No hay que modificar el compose: ya toma el `.env` automáticamente.
+
+Ten en cuenta que PostgreSQL usa `POSTGRES_USER` y `POSTGRES_PASSWORD` solo la primera vez que crea la base. Si las
+bases ya existían con las credenciales de desarrollo, hay que crearlas de nuevo (`docker compose down -v`) o
+cambiar la contraseña dentro de PostgreSQL.
+
+En una plataforma con gestor de secretos (por ejemplo, las variables de un servidor de CI/CD o un servicio de
+secretos en la nube), el proceso de despliegue escribe el `.env` en el servidor con esos valores antes de
+ejecutar `docker compose up`. Así las contraseñas no las escribe ni las ve nadie a mano.
+
 ## Volver a ejecutar o empezar de cero
 
 - **Ejecutar el DAG otra vez:** botón *Trigger DAG* en la interfaz de Airflow. Como el DAG es idempotente,
