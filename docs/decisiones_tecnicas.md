@@ -95,8 +95,7 @@ Diagrama: `docs/diagrama_modelo.png`. La versión para dbdiagram.io está en `do
 - **Códigos que no son productos** (POST, DOT, M, C2, BANK CHARGES, AMAZONFEE, CRUK, GIFT_..., etc.): son
   envíos, comisiones, descuentos y ajustes contables. Todo código que no cumple el patrón del catálogo
   `5 dígitos + letras opcionales` (por ejemplo `85123A`) se rechaza.
-- **Moneda:** ambas fuentes son de una tienda del Reino Unido, así que todos los montos quedan en libras
-  esterlinas (GBP), sin conversión.
+- **Moneda:** todos los montos quedan en libras esterlinas (GBP), sin conversión. Ver la sección 5.5.
 
 ## 5. Casos ambiguos
 
@@ -149,6 +148,36 @@ Los datasets no traen categoría. La API de productos sirve `data/catalogo/produ
 - **Activo:** un producto está activo si se vendió en los últimos 90 días del periodo.
 
 Los códigos que aparecen en las transacciones pero no en el catálogo quedan con categoría "Sin categoría".
+
+### 5.5 Monedas y países
+El contexto del enunciado (sección 1) dice que DataMart opera en Colombia, México y Perú, y que "la dirección no
+puede comparar el desempeño entre países porque las monedas y los formatos de fecha son distintos en cada fuente".
+
+**Lo que muestran los datos:**
+- **Una sola moneda.** Las dos fuentes son de la misma tienda en línea del Reino Unido. La documentación original
+  del dataset (UCI Online Retail) define el precio unitario en libras esterlinas, sin importar el país del cliente.
+  Un cliente de Francia o de Australia paga en libras; la conversión, si la hay, la hace su banco, no la tienda.
+- **Países distintos a los del contexto.** La columna `pais` es el país donde reside el cliente que compró. Hay
+  38 países: Reino Unido concentra el 90% de las transacciones, seguido de Alemania, Francia e Irlanda, más otros
+  como Estados Unidos, Brasil, Japón y Australia. Colombia, México y Perú no aparecen.
+
+**Decisión:**
+- Todos los montos se guardan en GBP, sin conversión. No hay varias monedas que unificar, así que convertir
+  solo agregaría tasas de cambio inventadas.
+- Los países se conservan tal como vienen. Reasignar ventas a Colombia, México o Perú sería inventar datos.
+
+**Por qué cumple el enunciado:**
+- El enunciado aclara que los datasets de Kaggle *representan* las fuentes de DataMart ("Para el contexto de
+  DataMart, este archivo representa el volcado diario de órdenes del sistema operacional").
+- Las reglas de negocio de la sección 5 no piden convertir monedas ni definir una moneda por país, y ninguna
+  pregunta de la sección 7 lo requiere.
+- Lo que sí venía distinto entre fuentes eran los formatos de fecha y los nombres de columna, y eso sí se unificó
+  (fechas a UTC y un esquema común).
+- La comparación entre países (pregunta 4) es válida porque todos los montos están en la misma moneda.
+
+**Si DataMart tuviera fuentes reales en COP, MXN y PEN:** se agregaría una columna `moneda` en las ventas, una
+tabla de tasas de cambio diarias y una columna con el monto convertido a una moneda de reporte. El resto del
+modelo no cambiaría.
 
 ## 6. Idempotencia
 
