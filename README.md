@@ -11,7 +11,7 @@ repositorio analítico en PostgreSQL, orquestado con Apache Airflow y todo dentr
 ## Requisitos
 
 - Docker con Docker Compose 2.24 o superior (Docker Desktop actual ya lo incluye).
-- Los puertos 8080, 8888 y 8000 libres.
+- Los puertos 8080, 8081, 8888 y 8000 libres.
 
 No hace falta instalar nada más: Python, pandas, Airflow, PostgreSQL y Jupyter corren dentro de los contenedores.
 
@@ -36,6 +36,7 @@ Al iniciar, de forma automática:
 | Airflow | http://localhost:8080 | usuario `admin`, contraseña `admin` |
 | Jupyter | http://localhost:8888 | sin contraseña |
 | API de productos | http://localhost:8000/docs | sin contraseña |
+| Adminer (ver la base) | http://localhost:8081/?pgsql=postgres-dw&username=datamart&db=datamart_dw | contraseña `datamart_pass` |
 
 ## Cómo verificar que funcionó
 
@@ -46,7 +47,10 @@ Al iniciar, de forma automática:
 4. **Los datos llegaron:** en http://localhost:8888 abre `notebooks/02_consultas_negocio.ipynb` y ejecútalo
    (*Run → Run All Cells*). Muestra el resultado de las consultas de cada pregunta de negocio sobre el repositorio
    analítico.
-5. **La API responde:** en http://localhost:8000/docs prueba `GET /productos` y `GET /productos/85123A`.
+5. **Las tablas:** en el enlace de Adminer de la tabla anterior escribe la contraseña `datamart_pass`. Se ven
+   las tablas del repositorio analítico; en cada una, *Select data* muestra sus filas y *SQL command* permite
+   ejecutar consultas.
+6. **La API responde:** en http://localhost:8000/docs prueba `GET /productos` y `GET /productos/85123A`.
 
 Si prefieres la terminal, estos comandos hacen las mismas verificaciones:
 
