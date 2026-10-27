@@ -37,6 +37,7 @@ Al iniciar, de forma automática:
 | Jupyter | http://localhost:8888 | sin contraseña |
 | API de productos | http://localhost:8000/docs | sin contraseña |
 | Adminer (ver la base) | http://localhost:8081/?pgsql=postgres-dw&username=datamart&db=datamart_dw | contraseña `datamart_pass` |
+| Adminer (metadatos de Airflow) | http://localhost:8081/?pgsql=postgres-airflow&username=datamart&db=airflow | contraseña `datamart_pass` |
 
 ## Cómo verificar que funcionó
 
