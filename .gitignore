@@ -1,0 +1,15 @@
+# Variables de entorno reales (nunca se suben al repositorio)
+.env
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Archivos temporales y del sistema operativo
+logs/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

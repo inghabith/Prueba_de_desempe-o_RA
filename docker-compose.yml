@@ -1,0 +1,117 @@
+# Entorno completo del pipeline DataMart.
+# Con "docker compose up" se levantan todos los servicios sin pasos manuales:
+#   - postgres-airflow : base de metadatos interna de Airflow
+#   - postgres-dw      : repositorio analítico (tablas creadas desde sql/ddl al iniciar)
+#   - api-productos    : API REST del catálogo de productos (sistema legado simulado)
+#   - airflow-init     : prepara Airflow (base, usuario admin, Connections y Variables) y termina
+#   - airflow-webserver: interfaz web en http://localhost:8080
+#   - airflow-scheduler: detecta y ejecuta el DAG
+#   - jupyter          : notebooks de exploración y consultas en http://localhost:8888
+
+# Configuración común de los tres servicios de Airflow.
+x-airflow-comun: &airflow-comun
+  image: apache/airflow:2.10.5
+  # Variables sensibles: se leen de .env.example y, si existe, de .env (que tiene prioridad).
+  env_file:
+    - path: .env.example
+    - path: .env
+      required: false
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    # El DAG queda activo apenas se crea, para que corra sin entrar a la interfaz.
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./data:/opt/airflow/data:ro
+    - ./airflow/init_airflow.sh:/opt/airflow/init_airflow.sh:ro
+  depends_on:
+    postgres-airflow:
+      condition: service_healthy
+
+services:
+  postgres-airflow:
+    image: postgres:16
+    env_file:
+      - path: .env.example
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: airflow
+    volumes:
+      - pg_airflow_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d airflow"]
+      interval: 5s
+      retries: 10
+
+  postgres-dw:
+    image: postgres:16
+    env_file:
+      - path: .env.example
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: datamart_dw
+    volumes:
+      - pg_dw_data:/var/lib/postgresql/data
+      # Los scripts de esta carpeta se ejecutan solos la primera vez y crean las tablas.
+      - ./sql/ddl:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d datamart_dw"]
+      interval: 5s
+      retries: 10
+
+  api-productos:
+    build: ./api
+    volumes:
+      - ./data/catalogo:/app/catalogo:ro
+    ports:
+      - "8000:8000"
+
+  airflow-init:
+    <<: *airflow-comun
+    entrypoint: /bin/bash
+    command: /opt/airflow/init_airflow.sh
+
+  airflow-webserver:
+    <<: *airflow-comun
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-comun
+    command: scheduler
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres-dw:
+        condition: service_healthy
+      api-productos:
+        condition: service_started
+
+  jupyter:
+    build: ./jupyter
+    env_file:
+      - path: .env.example
+      - path: .env
+        required: false
+    volumes:
+      - ./notebooks:/proyecto/notebooks
+      - ./data:/proyecto/data:ro
+      - ./sql:/proyecto/sql:ro
+    ports:
+      - "8888:8888"
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+
+volumes:
+  pg_airflow_data:
+  pg_dw_data:

@@ -1,0 +1,64 @@
+// Modelo del repositorio analítico de DataMart.
+// Para ver el diagrama interactivo: pegar este contenido en https://dbdiagram.io/d
+
+Table dim_producto {
+  codigo_producto varchar(20) [pk]
+  nombre text [note: 'Nombre canónico']
+  categoria varchar(30)
+  pais_proveedor varchar(60)
+  activo boolean
+}
+
+Table fact_ventas {
+  id_venta bigserial [pk]
+  factura varchar(20)
+  codigo_producto varchar(20) [ref: > dim_producto.codigo_producto]
+  descripcion_original text
+  fecha_utc timestamptz
+  cantidad integer
+  precio_unitario numeric(12,3)
+  revenue_bruto numeric(14,2)
+  cliente_id varchar(20)
+  pais varchar(60)
+  fuente varchar(30)
+}
+
+Table fact_devoluciones {
+  id_devolucion bigserial [pk]
+  factura varchar(20)
+  codigo_producto varchar(20) [ref: > dim_producto.codigo_producto]
+  descripcion_original text
+  fecha_utc timestamptz
+  tipo varchar(15) [note: 'CANCELACION o AJUSTE']
+  cantidad_devuelta integer
+  precio_unitario numeric(12,3)
+  monto_devuelto numeric(14,2)
+  cliente_id varchar(20)
+  pais varchar(60)
+  fuente varchar(30)
+}
+
+Table resumen_producto_diario {
+  fecha date [pk]
+  codigo_producto varchar(20) [pk, ref: > dim_producto.codigo_producto]
+  unidades_vendidas integer
+  revenue_bruto numeric(14,2)
+  unidades_devueltas integer
+  monto_devuelto numeric(14,2)
+  revenue_neto numeric(14,2)
+}
+
+Table log_rechazos {
+  id_rechazo bigserial [pk]
+  fuente varchar(30)
+  motivo text
+  factura varchar(20)
+  codigo_producto varchar(20)
+  descripcion text
+  cantidad integer
+  fecha_utc timestamptz
+  precio_unitario numeric(12,3)
+  cliente_id varchar(20)
+  pais varchar(60)
+  fecha_proceso date
+}
