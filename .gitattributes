@@ -1,0 +1,4 @@
+# Los scripts de shell deben conservar saltos de línea Unix (LF),
+# incluso si el repositorio se clona en Windows; de lo contrario no corren en los contenedores.
+*.sh text eol=lf
+*.gz binary
