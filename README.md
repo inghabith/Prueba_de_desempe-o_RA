@@ -48,7 +48,7 @@ Al iniciar, de forma automática:
 4. **Los datos llegaron:** en http://localhost:8888 abre `notebooks/02_consultas_negocio.ipynb` y ejecútalo
    (*Run → Run All Cells*). Muestra el resultado de las consultas de cada pregunta de negocio sobre el repositorio
    analítico.
-5. **Las tablas:** en el enlace de Adminer de la tabla anterior escribe la contraseña `datamart_pass`. Se ven
+5. **Las tablas:** abre el enlace "Adminer (ver la base)" de la tabla anterior y escribe la contraseña `datamart_pass`. Se ven
    las tablas del repositorio analítico; en cada una, *Select data* muestra sus filas y *SQL command* permite
    ejecutar consultas.
 6. **La API responde:** en http://localhost:8000/docs prueba `GET /productos` y `GET /productos/85123A`.
@@ -71,6 +71,65 @@ dos tablas de hechos, un resumen diario con el revenue bruto y neto, y el log de
 en [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md).
 
 ![Modelo de datos del repositorio analítico](docs/diagrama_modelo.png)
+
+## Pipeline (DAG `datamart_etl`)
+
+```
+extraer_ventas_diarias ─┐
+extraer_historico ──────┼─> transformar ─> validar_calidad ─> cargar_repositorio
+extraer_catalogo_api ───┘
+```
+
+- **Programación:** diaria (`@daily`), sin catchup, con 2 reintentos automáticos (1 minuto entre intentos).
+- **Connections:** `dw_postgres` (repositorio analítico) y `api_productos` (API de productos).
+- **Variables:** `ruta_datos`, `zona_horaria_origen` y `tamano_pagina_api`.
+- **Idempotente:** la carga vacía y vuelve a llenar las tablas en una sola transacción, y `fecha_proceso` es la
+  fecha lógica del DAG. Ejecutarlo dos veces el mismo día deja exactamente los mismos datos (verificado con un
+  hash de cada tabla).
+
+## Calidad de datos y reglas de negocio
+
+Todo se hace con pandas en `dags/etl/transformacion.py`. Los valores que se pueden cambiar (formatos, patrón de
+código, valores por defecto y motivos de rechazo) están en `dags/etl/config.py`.
+
+- Códigos de producto en mayúsculas y sin espacios; fechas convertidas de Europe/London a UTC.
+- Cantidad menor o igual a cero: va a `fact_devoluciones` (CANCELACION si la factura empieza con C, si no AJUSTE),
+  separada de las ventas.
+- Revenue bruto = cantidad x precio. Revenue neto = bruto menos devoluciones del mismo producto el mismo día
+  (`resumen_producto_diario`).
+- Se rechazan con su motivo y su fuente en `log_rechazos`: duplicados exactos, duplicados entre fuentes, fechas
+  inconsistentes, códigos que no son productos y ventas con precio menor o igual a cero.
+- Antes de cargar, `validar_calidad` revisa, entre otras cosas, que cada fila de entrada termine en ventas,
+  devoluciones o rechazos (1.078.259 = 522.504 + 9.992 + 545.763) y que revenue neto = bruto - devoluciones.
+
+## Decisiones principales
+
+Resumen de [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md), donde está cada una con sus números:
+
+- **Transacciones sin customer ID (24,9%):** se incluyen con el cliente `DESCONOCIDO` para no perder ~1,5 millones
+  de GBP en ventas; la pregunta 5 compara su comportamiento con el de los clientes identificados.
+- **Varias descripciones por código:** el nombre canónico es la descripción normalizada más frecuente (en empate,
+  la primera en orden alfabético).
+- **Duplicados entre fuentes:** el histórico trae las mismas facturas de la fuente diaria con fechas corridas
+  8 años y precios alterados. Es duplicada la línea con la misma factura y el mismo producto, y gana la fuente
+  diaria. Las que quedan tienen fechas posteriores a la fuente diaria y se rechazan como inconsistentes.
+- **Modelo estrella:** pocas tablas y un solo JOIN para responder las preguntas de negocio, con ventas y
+  devoluciones en tablas de hechos separadas.
+
+## Consultas SQL de validación
+
+Una por cada pregunta del enunciado, en `sql/consultas/`. Se pueden ejecutar en Adminer (*SQL command*) o ver sus
+resultados en `notebooks/02_consultas_negocio.ipynb`.
+
+| Pregunta | Archivo |
+|---|---|
+| 1. Evolución mensual de las ventas netas | `01_evolucion_mensual_ventas_netas.sql` |
+| 2. Categorías: revenue bruto y proporción de devoluciones | `02_categorias_revenue_y_devoluciones.sql` |
+| 3. Top 10 por revenue neto y por tasa de devolución | `03a_top10_productos_revenue_neto.sql`, `03b_top10_productos_tasa_devolucion.sql` |
+| 4. Países: transacciones y ticket promedio | `04_paises_transacciones_ticket.sql` |
+| 5. Clientes identificados vs. sin customer ID | `05_clientes_identificados_vs_desconocidos.sql` |
+| 6. Descripciones inconsistentes y códigos únicos | `06_descripciones_inconsistentes.sql` |
+| 7. Recomendación para el equipo de producto | `07_recomendacion_producto.sql` |
 
 ## Estructura del proyecto
 
