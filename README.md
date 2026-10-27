@@ -64,6 +64,14 @@ docker compose exec postgres-dw psql -U datamart -d datamart_dw -c "SELECT COUNT
 
 Resultado esperado: 522.504 ventas, 9.992 devoluciones, 545.763 rechazos y 3.911 productos.
 
+## Modelo de datos
+
+Repositorio analítico en modelo estrella: `dim_producto` al centro, las ventas y las devoluciones separadas en
+dos tablas de hechos, un resumen diario con el revenue bruto y neto, y el log de rechazos. La justificación está
+en [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md).
+
+![Modelo de datos del repositorio analítico](docs/diagrama_modelo.png)
+
 ## Estructura del proyecto
 
 ```
